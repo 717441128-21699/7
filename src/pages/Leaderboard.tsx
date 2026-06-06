@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useGameStore } from '../store/gameStore';
 import { formatNumber } from '../utils/gameUtils';
@@ -57,8 +57,12 @@ const medals: Record<number, string> = {
 };
 
 export default function Leaderboard() {
-  const { leaderboard, player } = useGameStore();
+  const { leaderboard, player, loadLeaderboard } = useGameStore();
   const [activeTab, setActiveTab] = useState<TabType>('wealth');
+
+  useEffect(() => {
+    loadLeaderboard().catch(() => {});
+  }, [loadLeaderboard]);
 
   const currentData = leaderboard[activeTab];
   const topThree = currentData.slice(0, 3);

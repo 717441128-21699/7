@@ -79,8 +79,9 @@ export default function Voyage() {
   const [isMoving, setIsMoving] = useState(false);
 
   useEffect(() => {
+    updateWeather().catch(() => {});
     const interval = setInterval(() => {
-      updateWeather();
+      updateWeather().catch(() => {});
     }, 10000);
     return () => clearInterval(interval);
   }, [updateWeather]);
@@ -100,7 +101,7 @@ export default function Voyage() {
     [voyageEvents]
   );
 
-  const handleStartVoyage = () => {
+  const handleStartVoyage = async () => {
     if (isMoving || activeEvent) return;
     setIsMoving(true);
     setPlayerPos(targetIsland);
@@ -109,7 +110,7 @@ export default function Voyage() {
     const startPos = { ...currentLocation };
     const startTime = Date.now();
 
-    const animate = () => {
+    const animate = async () => {
       const elapsed = Date.now() - startTime;
       const progress = Math.min(1, elapsed / duration);
       const easeProgress = 1 - Math.pow(1 - progress, 3);
@@ -121,21 +122,29 @@ export default function Voyage() {
         requestAnimationFrame(animate);
       } else {
         setIsMoving(false);
-        const event = startVoyage();
-        setActiveEvent(event);
-        setTargetIsland(islands[Math.floor(Math.random() * islands.length)]);
+        try {
+          const event = await startVoyage();
+          setActiveEvent(event);
+          setTargetIsland(islands[Math.floor(Math.random() * islands.length)]);
+        } catch (e) {
+          console.error('Failed to start voyage', e);
+        }
       }
     };
     requestAnimationFrame(animate);
   };
 
-  const handleResolveEvent = () => {
+  const handleResolveEvent = async () => {
     if (!activeEvent) return;
     const eventType = activeEvent.type;
-    resolveEvent(activeEvent.id);
-    setActiveEvent(null);
-    if (eventType === 'enemy' || eventType === 'merchant') {
-      navigate('/battle');
+    try {
+      await resolveEvent(activeEvent.id);
+      setActiveEvent(null);
+      if (eventType === 'enemy' || eventType === 'merchant') {
+        navigate('/battle');
+      }
+    } catch (e) {
+      console.error('Failed to resolve event', e);
     }
   };
 

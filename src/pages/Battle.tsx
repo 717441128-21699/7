@@ -27,14 +27,14 @@ export default function Battle() {
 
   useEffect(() => {
     if (!activeBattle) {
-      startBattle();
+      startBattle().catch(() => {});
     }
   }, [activeBattle, startBattle]);
 
   useEffect(() => {
     if (!activeBattle || activeBattle.status !== 'fighting') return;
     const interval = setInterval(() => {
-      tickBattle();
+      tickBattle().catch(() => {});
     }, 100);
     return () => clearInterval(interval);
   }, [activeBattle, tickBattle]);
@@ -98,19 +98,31 @@ export default function Battle() {
 
   const { playerShip, enemyShip, playerHeading, distance, cannonCooldowns, status, playerCrew } = activeBattle;
 
-  const handleFireCannon = (index: number) => {
-    fireCannon(index);
+  const handleFireCannon = async (index: number) => {
+    try {
+      await fireCannon(index);
+    } catch (e) {
+      console.error('Failed to fire cannon', e);
+    }
   };
 
-  const handleBoarding = () => {
-    initiateBoarding();
+  const handleBoarding = async () => {
+    try {
+      await initiateBoarding();
+    } catch (e) {
+      console.error('Failed to initiate boarding', e);
+    }
   };
 
-  const handleCloseModal = () => {
-    if (status === 'won') {
-      endBattle(true);
-    } else if (status === 'lost') {
-      endBattle(false);
+  const handleCloseModal = async () => {
+    try {
+      if (status === 'won') {
+        await endBattle(true);
+      } else if (status === 'lost') {
+        await endBattle(false);
+      }
+    } catch (e) {
+      console.error('Failed to end battle', e);
     }
   };
 

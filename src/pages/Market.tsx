@@ -1,7 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGameStore } from '../store/gameStore';
-import { getPriceSuggestion } from '../utils/gameUtils';
 import type { MarketListing, CrewMember } from '../types';
 
 type MarketTab = 'blueprint' | 'crewContract';
@@ -23,7 +22,13 @@ export default function Market() {
     announcements,
     createListing,
     buyListing,
+    getPriceSuggestion,
+    loadMarketListings,
   } = useGameStore();
+
+  useEffect(() => {
+    loadMarketListings();
+  }, [loadMarketListings]);
 
   const [activeTab, setActiveTab] = useState<MarketTab>('blueprint');
   const [sortKey, setSortKey] = useState<SortKey>('time');
@@ -31,6 +36,7 @@ export default function Market() {
   const [tierFilter, setTierFilter] = useState<number | null>(null);
   const [pricingItem, setPricingItem] = useState<ListingItem | null>(null);
   const [listingPrice, setListingPrice] = useState<string>('');
+  const [currentSuggestion, setCurrentSuggestion] = useState<{ min: number; max: number; avg: number } | null>(null);
   const [purchaseSuccess, setPurchaseSuccess] = useState<{
     show: boolean;
     itemName: string;
@@ -41,12 +47,18 @@ export default function Market() {
   const marqueeRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (pricingItem) {
-      const tier = pricingItem.blueprintTier || (pricingItem.crew?.level || 1);
-      const suggestion = getPriceSuggestion(pricingItem.type, tier);
-      setListingPrice(suggestion.avg.toString());
-    }
-  }, [pricingItem]);
+    const fetchSuggestion = async () => {
+      if (pricingItem) {
+        const tier = pricingItem.blueprintTier || (pricingItem.crew?.level || 1);
+        const suggestion = await getPriceSuggestion(pricingItem.type, tier);
+        setListingPrice(suggestion.avg.toString());
+        setCurrentSuggestion(suggestion);
+      } else {
+        setCurrentSuggestion(null);
+      }
+    };
+    fetchSuggestion();
+  }, [pricingItem, getPriceSuggestion]);
 
   const filteredListings = marketListings
     .filter((l) => l.type === activeTab)
@@ -83,31 +95,39 @@ export default function Market() {
     return '正常';
   };
 
-  const handleBuy = (listing: MarketListing) => {
-    const success = buyListing(listing.id);
-    if (success) {
-      const itemName =
-        listing.type === 'blueprint'
-          ? listing.item.blueprintName || '图纸'
-          : listing.item.crew?.name || '船员';
-      const triggeredBounty = listing.price > listing.suggestedPriceMax * 1.5;
-      setPurchaseSuccess({
-        show: true,
-        itemName,
-        price: listing.price,
-        bounty: triggeredBounty,
-      });
-      setTimeout(() => setPurchaseSuccess(null), 3000);
+  const handleBuy = async (listing: MarketListing) => {
+    try {
+      const success = await buyListing(listing.id);
+      if (success) {
+        const itemName =
+          listing.type === 'blueprint'
+            ? listing.item.blueprintName || '图纸'
+            : listing.item.crew?.name || '船员';
+        const triggeredBounty = listing.price > listing.suggestedPriceMax * 1.5;
+        setPurchaseSuccess({
+          show: true,
+          itemName,
+          price: listing.price,
+          bounty: triggeredBounty,
+        });
+        setTimeout(() => setPurchaseSuccess(null), 3000);
+      }
+    } catch (e) {
+      console.error('Failed to buy listing', e);
     }
   };
 
-  const handleConfirmListing = () => {
+  const handleConfirmListing = async () => {
     if (!pricingItem) return;
     const price = parseInt(listingPrice);
     if (isNaN(price) || price <= 0) return;
-    createListing(pricingItem.type, pricingItem, price);
-    setPricingItem(null);
-    setListingPrice('');
+    try {
+      await createListing(pricingItem.type, pricingItem, price);
+      setPricingItem(null);
+      setListingPrice('');
+    } catch (e) {
+      console.error('Failed to create listing', e);
+    }
   };
 
   const availableBlueprints = player.inventory.blueprints.filter(
@@ -494,42 +514,38 @@ export default function Market() {
                 </div>
               </div>
 
-              {(() => {
-                const tier = pricingItem.blueprintTier || (pricingItem.crew?.level || 1);
-                const suggestion = getPriceSuggestion(pricingItem.type, tier);
-                return (
-                  <>
-                    <div className="mb-4 text-sm text-parchment-300">
-                      <div className="mb-1">近7天均价: <span className="text-gold-300 font-mono">{suggestion.avg}</span> 金币</div>
-                      <div>
-                        建议区间: 
-                        <span className="text-green-400 font-mono mx-1">{suggestion.min}</span>
-                        ~
-                        <span className="text-blood-400 font-mono mx-1">{suggestion.max}</span>
-                        金币
-                      </div>
+              {currentSuggestion && (
+                <>
+                  <div className="mb-4 text-sm text-parchment-300">
+                    <div className="mb-1">近7天均价: <span className="text-gold-300 font-mono">{currentSuggestion.avg}</span> 金币</div>
+                    <div>
+                      建议区间: 
+                      <span className="text-green-400 font-mono mx-1">{currentSuggestion.min}</span>
+                      ~
+                      <span className="text-blood-400 font-mono mx-1">{currentSuggestion.max}</span>
+                      金币
                     </div>
+                  </div>
 
-                    <div className="mb-4">
-                      <label className="block text-parchment-300 text-sm mb-2 font-display">
-                        输入售价 (金币)
-                      </label>
-                      <input
-                        type="number"
-                        value={listingPrice}
-                        onChange={(e) => setListingPrice(e.target.value)}
-                        className="w-full px-4 py-3 bg-ocean-700/50 border-2 border-gold-500/50 rounded text-gold-200 font-mono text-lg text-center focus:border-gold-400 focus:outline-none transition-colors"
-                        placeholder="输入价格"
-                      />
-                      {listingPrice && parseInt(listingPrice) > suggestion.max * 1.5 && (
-                        <div className="mt-2 text-xs text-blood-400">
-                          ⚠️ 高价成交可能会吸引赏金猎人！
-                        </div>
-                      )}
-                    </div>
-                  </>
-                );
-              })()}
+                  <div className="mb-4">
+                    <label className="block text-parchment-300 text-sm mb-2 font-display">
+                      输入售价 (金币)
+                    </label>
+                    <input
+                      type="number"
+                      value={listingPrice}
+                      onChange={(e) => setListingPrice(e.target.value)}
+                      className="w-full px-4 py-3 bg-ocean-700/50 border-2 border-gold-500/50 rounded text-gold-200 font-mono text-lg text-center focus:border-gold-400 focus:outline-none transition-colors"
+                      placeholder="输入价格"
+                    />
+                    {listingPrice && parseInt(listingPrice) > currentSuggestion.max * 1.5 && (
+                      <div className="mt-2 text-xs text-blood-400">
+                        ⚠️ 高价成交可能会吸引赏金猎人！
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
 
               <div className="flex gap-3">
                 <motion.button

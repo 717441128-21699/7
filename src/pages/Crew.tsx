@@ -65,23 +65,31 @@ export default function Crew() {
     return list;
   }, [crew, roleFilter]);
 
-  const handleRecruit = (member: typeof RECRUITABLE_CREW[number]) => {
+  const handleRecruit = async (member: typeof RECRUITABLE_CREW[number]) => {
     const price = member.contractPrice || 100;
     if (player.gold < price) {
       showToast('error', `💰 金币不足！需要 ${price} 金币`);
       return;
     }
-    const success = recruitCrew(member);
-    if (success) {
-      showToast('success', `🎉 成功招募「${member.name}」！`);
-    } else {
-      showToast('error', '招募失败');
+    try {
+      const success = await recruitCrew(member);
+      if (success) {
+        showToast('success', `🎉 成功招募「${member.name}」！`);
+      } else {
+        showToast('error', '招募失败');
+      }
+    } catch (e) {
+      showToast('error', '招募失败，请稍后重试');
     }
   };
 
-  const handleDismiss = (id: string, name: string) => {
-    dismissCrew(id);
-    showToast('success', `👋 已解雇「${name}」`);
+  const handleDismiss = async (id: string, name: string) => {
+    try {
+      await dismissCrew(id);
+      showToast('success', `👋 已解雇「${name}」`);
+    } catch (e) {
+      showToast('error', '解雇失败，请稍后重试');
+    }
   };
 
   return (

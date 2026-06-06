@@ -331,16 +331,20 @@ export default function Shipyard() {
     }
   };
 
-  const handleBuild = () => {
+  const handleBuild = async () => {
     if (!canBuild) return;
-    const success = buildShip(shipName.trim(), selectedHull, selectedCannons, selectedSail, selectedArmor);
-    if (success) {
-      setBuildMessage({ type: 'success', text: `🎉 船只「${shipName.trim()}」建造成功！` });
-      setTimeout(() => {
-        navigate('/');
-      }, 1500);
-    } else {
-      setBuildMessage({ type: 'error', text: '建造失败，请检查金币是否充足' });
+    try {
+      const success = await buildShip(shipName.trim(), selectedHull, selectedCannons, selectedSail, selectedArmor);
+      if (success) {
+        setBuildMessage({ type: 'success', text: `🎉 船只「${shipName.trim()}」建造成功！` });
+        setTimeout(() => {
+          navigate('/');
+        }, 1500);
+      } else {
+        setBuildMessage({ type: 'error', text: '建造失败，请检查金币是否充足' });
+      }
+    } catch (e) {
+      setBuildMessage({ type: 'error', text: '建造失败，请稍后重试' });
     }
     setTimeout(() => setBuildMessage(null), 3000);
   };

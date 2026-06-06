@@ -35,16 +35,20 @@ const itemVariants = {
 
 export default function Home() {
   const navigate = useNavigate();
-  const { player, currentShip, voyageEvents, startVoyage, generateWeeklyLog } = useGameStore();
+  const { player, currentShip, voyageEvents, startVoyage, generateWeeklyLog, loadPlayer } = useGameStore();
 
   useEffect(() => {
-    if (voyageEvents.length === 0) {
-      for (let i = 0; i < 5; i++) {
-        startVoyage();
+    loadPlayer().catch(() => {});
+    const init = async () => {
+      if (voyageEvents.length === 0) {
+        for (let i = 0; i < 5; i++) {
+          await startVoyage();
+        }
       }
-    }
-    generateWeeklyLog();
-  }, [voyageEvents.length, startVoyage, generateWeeklyLog]);
+      await generateWeeklyLog();
+    };
+    init().catch(() => {});
+  }, [loadPlayer, voyageEvents.length, startVoyage, generateWeeklyLog]);
 
   const recentEvents = [...voyageEvents]
     .sort((a, b) => b.timestamp - a.timestamp)
